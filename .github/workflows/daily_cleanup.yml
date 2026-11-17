@@ -1,0 +1,56 @@
+
+name: SGLiveJobs Daily Cleanup
+
+on:
+  schedule:
+    # 23:30 IST = 18:00 UTC
+    - cron: '0 18 * * *'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sglivejobs-daily-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup-public-dataset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+
+      # 1. Checkout public data repository
+      - name: Checkout public data repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      # 2. Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. Run daily cleanup
+      - name: Run daily cleanup
+        run: |
+          python cleanup_public_dataset.py
+
+      # 4. Commit and push cleaned dataset
+      - name: Commit and push cleaned dataset
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add sg-live-jobs.jsonl
+
+          if git diff --cached --quiet; then
+            echo "No changes required in public dataset."
+          else
+            git commit -m "Daily cleanup: retain rolling 21-day jobs"
+            git push origin HEAD:master
+          fi
